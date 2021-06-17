@@ -11,7 +11,7 @@ services:
   readsb:
     #image: mikenye/readsb-protobuf:latest_amd64
     #image: mikenye/readsb-protobuf:latest
-    image: keithdw/readsb-protobuf:latest
+    image: keithdw/docker-readsb-protobuf:latest
     tty: true
     container_name: readsb
     hostname: readsb
