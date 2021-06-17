@@ -1,0 +1,135 @@
+version: '3.8'
+
+volumes:
+  readsbpb_rrd:
+  readsbpb_autogain:
+  tar1090_heatmap:
+  tar1090_json:
+  vrsconfig:
+
+services:
+  readsb:
+    #image: mikenye/readsb-protobuf:latest_amd64
+    image: mikenye/readsb-protobuf:latest
+    tty: true
+    container_name: readsb
+    hostname: readsb
+    restart: always
+    devices:
+      - /dev/bus/usb
+    ports:
+      - 8080:8080
+    environment:
+      - TZ=${FEEDER_TZ}
+      - READSB_DEVICE_TYPE=rtlsdr
+      - READSB_RTLSDR_DEVICE=1090
+      - READSB_GAIN=autogain
+      - READSB_LAT=${FEEDER_LAT}
+      - READSB_LON=${FEEDER_LONG}
+      - READSB_RX_LOCATION_ACCURACY=2
+      - READSB_STATS_RANGE=true
+      - READSB_NET_ENABLE=true
+    volumes:
+      - readsbpb_rrd:/run/collectd
+      - readsbpb_autogain:/run/autogain
+    tmpfs:
+      - /run/readsb
+      - /var/log
+  fr24:
+    image: mikenye/fr24feed:latest
+    tty: true
+    container_name: fr24
+    restart: always
+    depends_on:
+     - readsb
+    ports:
+     - 8754:8754
+    environment:
+      - BEASTHOST=readsb
+      - TZ=${FEEDER_TZ}
+      - FR24KEY=${FR24_SHARING_KEY}
+      - MLAT=yes
+    tmpfs:
+      - /var/log
+  piaware:
+    image: mikenye/piaware:latest_i386
+    #image: mikenye/piaware:latest
+    #image: keithdw/piaware:latest
+    tty: true
+    container_name: piaware
+    restart: always
+    depends_on:
+      - readsb
+    ports:
+      - 8081:8080
+    environment:
+      - BEASTHOST=readsb
+      - LAT=${FEEDER_LAT}
+      - LONG=${FEEDER_LONG}
+      - TZ=${FEEDER_TZ}
+      - FEEDER_ID=${PIAWARE_FEEDER_ID}
+    tmpfs:
+      - /run:exec,size=64M
+      - /var/log
+  tar1090:
+    image: mikenye/tar1090:latest
+    tty: true
+    container_name: tar1090
+    restart: always
+    environment:
+      - UPDATE_TAR1090=false
+      - TZ=${FEEDER_TZ}
+      - BEASTHOST=readsb
+      - LAT=${FEEDER_LAT}
+      - LONG=${FEEDER_LONG}
+      - TAR1090_DEFAULTCENTERLAT=${FEEDER_LAT}
+      - TAR1090_DEFAULTCENTERLON=${FEEDER_LONG}
+    ports:
+      - 8082:80
+    volumes:
+      - "tar1090_heatmap:/var/globe_history"
+      - "tar1090_json:/run/readsb"
+    tmpfs:
+      - /run:exec,size=64M
+      - /var/log
+  virtualradarserver:
+    image: mikenye/virtualradarserver:latest
+    tty: true
+    container_name: vrs
+    restart: always
+    volumes:
+      - vrsconfig:/config
+    ports:
+      - 8077:8080
+    environment:
+      - USERNAME=vrsadmin
+      - PASSWORD=vrsadmin
+      - BASESTATIONHOST=readsb
+  360radar:
+    image: keithdw/adsbradar
+    tty: true
+    container_name: 360radar
+    restart: always
+    depends_on:
+      - readsb
+    environment:
+     - BEASTHOST=readsb
+     - TZ=Europe/London
+     - LAT=56.051128760570045
+     - LONG=-4.532320559956133
+     - ALT=32.96
+     - SITENAME=GartocharnAberKDW
+     - REGION=scotland
+  pfclient:
+    image: mikenye/planefinder:latest
+    tty: true
+    container_name: pfclient
+    restart: always
+    ports:
+      - 30053:30053
+    environment:
+      - TZ=${FEEDER_TZ}
+      - BEASTHOST=readsb
+      - LAT=${FEEDER_LAT}
+      - LONG=${FEEDER_LONG}
+      - SHARECODE=${PLANEFINDER_SHARECODE}
