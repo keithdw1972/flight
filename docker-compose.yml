@@ -16,6 +16,7 @@ services:
     container_name: readsb
     hostname: readsb
     restart: always
+    privileged: true
     devices:
       - /dev/bus/usb
     ports:
